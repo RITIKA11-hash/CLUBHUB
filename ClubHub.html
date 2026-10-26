@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClubHub</title>
+<style>
+body{font-family:Arial;margin:0;background:#f3f5f9;color:#222}
+header{background:#22304f;color:#fff;padding:12px 20px}
+.addr{background:#e8ebf2;padding:6px 20px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #d0d5e0}
+.addr span{background:#fff;border:1px solid #cfd4e0;border-radius:14px;padding:4px 14px;font-size:13px;color:#333;flex:1;max-width:420px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+nav{padding:10px 20px}
+button{padding:8px 14px;margin:2px;border:0;border-radius:4px;background:#2f5fd0;color:#fff;cursor:pointer}
+main{max-width:800px;margin:auto;padding:0 20px 30px}
+.card{background:#fff;border:1px solid #ddd;border-radius:6px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:16px;flex-wrap:wrap}
+.club{flex:1;min-width:220px;border-top:6px solid}
+input,select{padding:8px;margin:2px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:8px;border-bottom:1px solid #ddd}
+.red{background:#c0392b}
+.err{color:#c0392b}
+</style>
+</head>
+<body>
+<div class="addr"><span>🔒 https://clubhub.in</span></div>
+<header>
+  <h2 style="margin:0">Club Management System</h2>
+</header>
+<nav>
+  <button onclick="show('home')">Home</button>
+  <button onclick="show('members')">Members</button>
+  <button onclick="show('events')">Events</button>
+  <button onclick="show('register')">Registration</button>
+  Club: <select id="clubSelect" onchange="changeClub()"></select>
+</nav>
+<main>
+
+<div id="home" class="page">
+  <div class="card" style="background:#22304f;color:#fff;text-align:center">
+    <h2>Welcome to the Club Hub</h2>
+    <p>Manage Srijan and CNC in one place</p>
+  </div>
+  <div class="row" id="clubCards"></div>
+</div>
+
+<div id="members" class="page" style="display:none">
+  <div class="card">
+    <h3>Members of <span class="cn"></span></h3>
+    <input id="mName" placeholder="Name">
+    <input id="mEmail" placeholder="Email">
+    <button onclick="addMember()">Add member</button>
+    <p class="err" id="mErr"></p>
+    <table><tr><th>Name</th><th>Email</th><th></th></tr><tbody id="mBody"></tbody></table>
+  </div>
+</div>
+
+<div id="events" class="page" style="display:none">
+  <div class="card">
+    <h3>Events of <span class="cn"></span></h3>
+    <input id="eTitle" placeholder="Event title">
+    <input id="eDate" type="date">
+    <button onclick="addEvent()">Add event</button>
+    <p class="err" id="eErr"></p>
+    <table><tr><th>Title</th><th>Date</th><th></th></tr><tbody id="eBody"></tbody></table>
+  </div>
+</div>
+
+<div id="register" class="page" style="display:none">
+  <div class="card">
+    <h3>Registration for <span class="cn"></span></h3>
+    <select id="rMember"></select>
+    <select id="rEvent"></select>
+    <button onclick="addReg()">Register</button>
+    <p class="err" id="rErr"></p>
+    <table><tr><th>Member</th><th>Event</th><th></th></tr><tbody id="rBody"></tbody></table>
+  </div>
+</div>
+
+</main>
+<script>
+// 1. DATA - everything is stored in arrays
+var clubs = ["Srijan", "CNC"];
+var colors = {Srijan: "#d9822b", CNC: "#1f8a8a"};
+var members = [], events = [], regs = [];
+var current = "Srijan";
+
+// 2. SAVE AND LOAD (localStorage keeps data after refresh)
+function save() {
+  try { localStorage.setItem("club3", JSON.stringify({m: members, e: events, r: regs})); } catch (x) {}
+}
+function load() {
+  try {
+    var d = JSON.parse(localStorage.getItem("club3"));
+    if (d) { members = d.m; events = d.e; regs = d.r; }
+  } catch (x) {}
+  if (members.length == 0 && events.length == 0) {   // sample data
+    members = [{id: 1, club: "Srijan", name: "Aarav Sharma", email: "aarav@mail.com"},
+               {id: 2, club: "CNC", name: "Riya Verma", email: "riya@mail.com"}];
+    events = [{id: 1, club: "Srijan", title: "Cultural Night", date: "2026-11-20"},
+              {id: 2, club: "CNC", title: "Coding Workshop", date: "2026-11-15"}];
+    regs = [{id: 1, memberId: 2, eventId: 2}];
+  }
+}
+
+// 3. SMALL HELPER FUNCTIONS
+function $(id) { return document.getElementById(id); }
+function mine(list) { return list.filter(function (x) { return x.club == current; }); }
+function find(list, id) { return list.filter(function (x) { return x.id == id; })[0]; }
+function show(page) {
+  var pages = document.getElementsByClassName("page");
+  for (var i = 0; i < pages.length; i++) { pages[i].style.display = "none"; }
+  $(page).style.display = "block";
+}
+function changeClub() { current = $("clubSelect").value; render(); }
+function openClub(name) { current = name; $("clubSelect").value = name; render(); show("members"); }
+
+// 4. ADD AND DELETE
+function addMember() {
+  var name = $("mName").value, email = $("mEmail").value;
+  if (name == "" || email.indexOf("@") < 0) { $("mErr").innerHTML = "Enter a name and a valid email."; return; }
+  members.push({id: Date.now(), club: current, name: name, email: email});
+  $("mName").value = ""; $("mEmail").value = ""; $("mErr").innerHTML = "";
+  save(); render();
+}
+function delMember(id) {
+  members = members.filter(function (m) { return m.id != id; });
+  regs = regs.filter(function (r) { return r.memberId != id; });
+  save(); render();
+}
+function addEvent() {
+  var title = $("eTitle").value, date = $("eDate").value;
+  if (title == "" || date == "") { $("eErr").innerHTML = "Enter a title and a date."; return; }
+  events.push({id: Date.now(), club: current, title: title, date: date});
+  $("eTitle").value = ""; $("eDate").value = ""; $("eErr").innerHTML = "";
+  save(); render();
+}
+function delEvent(id) {
+  events = events.filter(function (e) { return e.id != id; });
+  regs = regs.filter(function (r) { return r.eventId != id; });
+  save(); render();
+}
+function addReg() {
+  var m = $("rMember").value, e = $("rEvent").value;
+  if (m == "" || e == "") { $("rErr").innerHTML = "Add a member and an event first."; return; }
+  var already = regs.filter(function (r) { return r.memberId == m && r.eventId == e; }).length > 0;
+  if (already) { $("rErr").innerHTML = "Already registered."; return; }
+  regs.push({id: Date.now(), memberId: Number(m), eventId: Number(e)});
+  $("rErr").innerHTML = ""; save(); render();
+}
+function delReg(id) {
+  regs = regs.filter(function (r) { return r.id != id; });
+  save(); render();
+}
+
+// 5. RENDER - draws everything on the screen from the arrays
+function render() {
+  var html = "";
+  for (var i = 0; i < clubs.length; i++) {
+    var c = clubs[i];
+    var mc = members.filter(function (m) { return m.club == c; }).length;
+    var ec = events.filter(function (e) { return e.club == c; }).length;
+    html += "<div class='card club' style='border-color:" + colors[c] + "'>" +
+            "<h2 style='color:" + colors[c] + "'>" + c + "</h2>" +
+            "<p>Members: <b>" + mc + "</b><br>Events: <b>" + ec + "</b></p>" +
+            "<button style='background:" + colors[c] + "' onclick=\"openClub('" + c + "')\">Open " + c + "</button></div>";
+  }
+  $("clubCards").innerHTML = html;
+
+  var names = document.getElementsByClassName("cn");
+  for (var i = 0; i < names.length; i++) { names[i].innerHTML = current; }
+
+  var cm = mine(members), ce = mine(events), s = "";
+  for (var i = 0; i < cm.length; i++) {
+    s += "<tr><td>" + cm[i].name + "</td><td>" + cm[i].email + "</td><td><button class='red' onclick='delMember(" + cm[i].id + ")'>Delete</button></td></tr>";
+  }
+  $("mBody").innerHTML = s;
+
+  s = "";
+  for (var i = 0; i < ce.length; i++) {
+    s += "<tr><td>" + ce[i].title + "</td><td>" + ce[i].date + "</td><td><button class='red' onclick='delEvent(" + ce[i].id + ")'>Delete</button></td></tr>";
+  }
+  $("eBody").innerHTML = s;
+
+  var mo = "", eo = "";
+  for (var i = 0; i < cm.length; i++) { mo += "<option value='" + cm[i].id + "'>" + cm[i].name + "</option>"; }
+  for (var i = 0; i < ce.length; i++) { eo += "<option value='" + ce[i].id + "'>" + ce[i].title + "</option>"; }
+  $("rMember").innerHTML = mo;
+  $("rEvent").innerHTML = eo;
+
+  s = "";
+  for (var i = 0; i < regs.length; i++) {
+    var m = find(members, regs[i].memberId), e = find(events, regs[i].eventId);
+    if (m && e && m.club == current) {
+      s += "<tr><td>" + m.name + "</td><td>" + e.title + "</td><td><button class='red' onclick='delReg(" + regs[i].id + ")'>Remove</button></td></tr>";
+    }
+  }
+  $("rBody").innerHTML = s;
+}
+
+// 6. START
+var opts = "";
+for (var i = 0; i < clubs.length; i++) { opts += "<option>" + clubs[i] + "</option>"; }
+$("clubSelect").innerHTML = opts;
+load();
+render();
+</script>
+</body>
+</html>
